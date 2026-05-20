@@ -137,7 +137,7 @@ st.caption("Carga el JSON exportado del taller. Score = Σ(Peso% · x). Modo 1 c
 # -------------------
 # Sidebar
 # -------------------
-view = st.sidebar.radio("Pantalla", ["A. Scoring", "B. Resumen estratégico"])
+view = st.sidebar.radio("Pantalla", ["A. Scoring", "B. Resumen estratégico", "C. Ayuda"])
 st.sidebar.image("LOGOTIPO-AES-05.png", use_container_width=True)
 st.sidebar.markdown("---")
 
@@ -652,3 +652,161 @@ else:
     st.divider()
     st.markdown("### 🧾 Notas")
     st.write("Los ejemplos se recalculan con tu JSON y los umbrales A/B/C/D/E actuales.")
+
+# =========================================================
+# VISTA C: AYUDA
+# =========================================================
+
+if view == "C. Ayuda":
+    st.markdown("# Ayuda y documentación de la app")
+
+    st.markdown("""
+    ## ¿Para qué sirve esta aplicación?
+
+    Esta app permite calcular el **scoring de clientes** de Europea Seguros a partir de un modelo configurado en un archivo JSON exportado desde el taller.
+
+    El objetivo es clasificar clientes en tipos **A, B, C, D o E** según su puntuación total.
+
+    La fórmula utilizada es:
+
+    """)
+
+    st.latex(r"Score=\sum_i (Peso_i \cdot x_i)")
+
+    st.markdown("""
+    Donde:
+
+    - **Peso_i** es el peso porcentual de cada variable.
+    - **x_i** es el valor normalizado de la opción seleccionada para esa variable.
+    - El resultado final se expresa como porcentaje.
+
+    ---
+
+    ## Archivos necesarios
+
+    ### 1. JSON del modelo del taller
+
+    Es obligatorio cargar un archivo **JSON** en la barra lateral.
+
+    Este archivo debe contener:
+
+    - Variables del modelo.
+    - Peso de cada variable.
+    - Número de categorías por variable.
+    - Etiquetas de cada categoría.
+    - Gaps o penalizaciones entre categorías.
+
+    Sin este archivo, la aplicación no puede calcular scores.
+
+    ---
+
+    ### 2. Archivo CSV o Excel para scoring masivo
+
+    Opcionalmente, se puede subir un archivo **CSV** o **Excel (.xlsx)** con una fila por cliente.
+
+    Cada columna debe corresponderse con una variable del modelo.
+
+    Los valores pueden introducirse de dos formas:
+
+    - Usando la **etiqueta exacta** de la categoría.
+    - Usando el **índice numérico** de la categoría, empezando en 0.
+
+    Si una variable no existe en el archivo, está vacía o no coincide con ninguna opción válida, contará como **x = 0**.
+
+    ---
+
+    ## Pantalla A: Scoring
+
+    En esta pantalla se puede trabajar de dos formas:
+
+    ### Scoring masivo
+
+    Permite subir un CSV o Excel con varios clientes.
+
+    La app devuelve:
+
+    - Score total de cada cliente.
+    - Tipo A/B/C/D/E.
+    - Distribución porcentual por tipo.
+    - Archivo CSV descargable con los resultados.
+
+    También se puede descargar una **plantilla Excel vacía** con las columnas necesarias.
+
+    ### Scoring manual de un cliente
+
+    Permite seleccionar manualmente una categoría para cada variable.
+
+    La app calcula en tiempo real:
+
+    - Score total.
+    - Tipo asignado.
+    - Contribución de cada variable al score.
+
+    Además, incluye botones para generar ejemplos aleatorios de clientes tipo A, B, C, D o E.
+
+    ---
+
+    ## Pantalla B: Resumen estratégico
+
+    Esta pantalla genera una visión resumida de los perfiles tipo.
+
+    Para cada cliente A, B, C, D y E muestra:
+
+    - Un ejemplo de score.
+    - Las principales variables que más contribuyen.
+    - Los drivers más relevantes del perfil.
+
+    Sirve para entender qué características definen a cada tipo de cliente.
+
+    ---
+
+    ## Clasificación A/B/C/D/E
+
+    Los umbrales se configuran en la barra lateral.
+
+    Por defecto:
+
+    - Tipo A: score igual o superior a 80.
+    - Tipo B: score igual o superior a 65.
+    - Tipo C: score igual o superior a 50.
+    - Tipo D: score igual o superior a 30.
+    - Tipo E: score inferior al umbral de D.
+
+    Es importante mantener los umbrales en orden:
+
+    **A ≥ B ≥ C ≥ D**
+
+    ---
+
+    ## Reglas importantes
+
+    - El JSON del taller es obligatorio.
+    - Los pesos y valores normalizados se leen del JSON.
+    - El scoring masivo solo funciona correctamente si las columnas coinciden con las variables del modelo.
+    - Las etiquetas deben coincidir exactamente con las opciones del JSON.
+    - Los índices numéricos empiezan en 0.
+    - Los valores no reconocidos puntúan como 0.
+
+    ---
+
+    ## Salidas de la aplicación
+
+    La app permite obtener:
+
+    - Score individual.
+    - Clasificación A/B/C/D/E.
+    - Ranking de contribución por variable.
+    - Resultados masivos descargables en CSV.
+    - Resumen estratégico de perfiles tipo.
+
+    ---
+
+    ## Uso recomendado
+
+    1. Cargar el JSON exportado del taller.
+    2. Revisar o ajustar los umbrales A/B/C/D/E.
+    3. Usar el scoring manual para validar casos individuales.
+    4. Descargar la plantilla Excel si se va a hacer scoring masivo.
+    5. Subir el archivo de clientes.
+    6. Descargar los resultados finales.
+    """)
