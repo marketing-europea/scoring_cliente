@@ -176,24 +176,26 @@ def classify(score: float) -> str:
     return "E"
 
 
-# --- Cargar JSON y construir modelo ANTES de usar WEIGHTS/CONFIG ---
-if uploaded_model is None:
-    st.info("Sube el JSON del taller en la barra lateral para cargar pesos/k/etiquetas/gaps.")
-    st.stop()
+# --- Cargar JSON y construir modelo ---
+model_loaded = False
+WEIGHTS = {}
+CONFIG = {}
+VAR_LIST = []
 
-try:
-    model = json.load(uploaded_model)
-except Exception as e:
-    st.error(f"No he podido leer el JSON: {e}")
-    st.stop()
+if uploaded_model is not None:
+    try:
+        model = json.load(uploaded_model)
 
-WEIGHTS, CONFIG = build_model_from_taller_json(model)
-VAR_LIST = list(WEIGHTS.keys())
+        WEIGHTS, CONFIG = build_model_from_taller_json(model)
+        VAR_LIST = list(WEIGHTS.keys())
 
-if not VAR_LIST:
-    st.error("El JSON no contiene variables válidas.")
-    st.stop()
+        if VAR_LIST:
+            model_loaded = True
+        else:
+            st.error("El JSON no contiene variables válidas.")
 
+    except Exception as e:
+        st.error(f"No he podido leer el JSON: {e}")
 
 # =========================================================
 # Helpers scoring (batch + manual)
