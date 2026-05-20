@@ -41,14 +41,17 @@ def gaps_to_x(k: int, gaps: List[float], cap_mode: str = "clip") -> Dict:
         raise ValueError("k debe ser >= 2.")
 
     gaps = list(gaps or [])
+
     if len(gaps) < k - 1:
         gaps += [0.0] * ((k - 1) - len(gaps))
+
     if len(gaps) > k - 1:
         gaps = gaps[: k - 1]
 
     gaps = [max(0.0, float(g)) for g in gaps]
 
     s = sum(gaps)
+
     if s > 1.0 + 1e-12:
         if cap_mode == "scale" and s > 0:
             gaps = [g / s for g in gaps]
@@ -89,6 +92,7 @@ def build_model_from_taller_json(
 
     for v in model_dict.get("variables", []):
         name = str(v.get("name", "")).strip()
+
         if not name:
             continue
 
@@ -99,6 +103,7 @@ def build_model_from_taller_json(
 
         if len(labels) < k:
             labels = labels + [""] * (k - len(labels))
+
         if len(labels) > k:
             labels = labels[:k]
 
@@ -120,8 +125,8 @@ def build_model_from_taller_json(
 # 2) APP
 # =========================================================
 
-st.title("Calculadora de Scoring de Cliente (con modelo del taller)")
-st.caption("Carga el JSON exportado del taller. Score = Σ(Peso% · x). Modo 1 cliente o archivo masivo.")
+st.title("Calculadora de Scoring de Cliente")
+st.caption("Modelo de scoring de clientes con JSON del taller, scoring manual, scoring masivo y resumen estratégico.")
 
 
 # =========================================================
@@ -131,18 +136,21 @@ st.caption("Carga el JSON exportado del taller. Score = Σ(Peso% · x). Modo 1 c
 st.sidebar.image("LOGOTIPO-AES-05.png", use_container_width=True)
 st.sidebar.markdown("---")
 
-st.sidebar.header("Modelo (JSON del taller)")
-uploaded_model = st.sidebar.file_uploader("Sube el JSON exportado del taller", type=["json"])
-st.sidebar.caption("Nota: en esta calculadora los x se leen del JSON (gaps).")
+st.sidebar.header("Modelo")
+uploaded_model = st.sidebar.file_uploader(
+    "Sube el JSON exportado del taller",
+    type=["json"]
+)
 
+st.sidebar.caption("La ayuda está disponible aunque no cargues ningún JSON.")
 st.sidebar.markdown("---")
 
-pantallas = ["A. Scoring", "B. Resumen estratégico", "C. Ayuda"]
+pantallas = ["C. Ayuda", "A. Scoring", "B. Resumen estratégico"]
 
 view = st.sidebar.radio(
     "Pantalla",
     pantallas,
-    index=2 if uploaded_model is None else 0
+    index=0
 )
 
 st.sidebar.markdown("---")
@@ -159,7 +167,7 @@ b_min = st.sidebar.slider("Tipo B si Score ≥", 0.0, 100.0, DEFAULT_B_MIN, 1.0)
 c_min = st.sidebar.slider("Tipo C si Score ≥", 0.0, 100.0, DEFAULT_C_MIN, 1.0)
 d_min = st.sidebar.slider("Tipo D si Score ≥", 0.0, 100.0, DEFAULT_D_MIN, 1.0)
 
-st.sidebar.caption("Tipo E automáticamente desde 0 hasta el umbral de D")
+st.sidebar.caption("Tipo E automáticamente desde 0 hasta el umbral de D.")
 
 
 # =========================================================
@@ -167,9 +175,9 @@ st.sidebar.caption("Tipo E automáticamente desde 0 hasta el umbral de D")
 # =========================================================
 
 model_loaded = False
-WEIGHTS = {}
-CONFIG = {}
-VAR_LIST = []
+WEIGHTS: Dict[str, float] = {}
+CONFIG: Dict[str, Tuple[List[str], List[float]]] = {}
+VAR_LIST: List[str] = []
 
 if uploaded_model is not None:
     try:
@@ -187,6 +195,10 @@ if uploaded_model is not None:
         st.error(f"No he podido leer el JSON: {e}")
 
 
+# =========================================================
+# HELPERS
+# =========================================================
+
 def classify(score: float) -> str:
     if score >= a_min:
         return "A"
@@ -199,10 +211,6 @@ def classify(score: float) -> str:
     return "E"
 
 
-# =========================================================
-# HELPERS SCORING
-# =========================================================
-
 def x_from_value(var: str, val) -> float:
     labels, xs = CONFIG[var]
 
@@ -211,8 +219,10 @@ def x_from_value(var: str, val) -> float:
 
     if isinstance(val, (int, float)) and not isinstance(val, bool):
         idx = int(val)
+
         if 0 <= idx < len(labels):
             return float(xs[idx])
+
         return 0.0
 
     if isinstance(val, str):
@@ -223,8 +233,10 @@ def x_from_value(var: str, val) -> float:
 
         try:
             idx = int(v)
+
             if 0 <= idx < len(labels):
                 return float(xs[idx])
+
         except Exception:
             pass
 
@@ -233,26 +245,33 @@ def x_from_value(var: str, val) -> float:
 
 def score_row(row: pd.Series) -> float:
     total = 0.0
+
     for var, weight in WEIGHTS.items():
         x = x_from_value(var, row.get(var, None))
         total += weight * x
+
     return float(total)
 
 
 def ensure_state():
     for v in VAR_LIST:
         key = f"sel_{v}"
+
         if key not in st.session_state:
             st.session_state[key] = 0
 
 
 def score_from_session() -> float:
     total = 0.0
+
     for var, weight in WEIGHTS.items():
         _, xs = CONFIG[var]
+
         idx = int(st.session_state.get(f"sel_{var}", 0))
         idx = max(0, min(idx, len(xs) - 1))
+
         total += weight * float(xs[idx])
+
     return float(total)
 
 
@@ -261,8 +280,10 @@ def min_max_score_possible() -> Tuple[float, float]:
 
     for var, w in WEIGHTS.items():
         _, xs = CONFIG[var]
+
         if not xs:
             continue
+
         min_s += w * float(min(xs))
         max_s += w * float(max(xs))
 
@@ -281,9 +302,11 @@ def set_all_indices(mode: str):
         if mode == "max":
             best_idx = max(range(n), key=lambda i: xs[i])
             st.session_state[f"sel_{var}"] = best_idx
+
         elif mode == "min":
             worst_idx = min(range(n), key=lambda i: xs[i])
             st.session_state[f"sel_{var}"] = worst_idx
+
         else:
             st.session_state[f"sel_{var}"] = n // 2
 
@@ -300,15 +323,16 @@ def score_from_state(state: Dict[str, int]) -> float:
 
     for var, w in WEIGHTS.items():
         _, xs = CONFIG[var]
+
         idx = int(state.get(f"sel_{var}", 0))
         idx = max(0, min(idx, len(xs) - 1))
+
         total += w * float(xs[idx])
 
     return float(total)
 
 
 def fill_random_client(tipo: str, tries: int = 400) -> Tuple[bool, float, str]:
-
     if not (a_min >= b_min >= c_min >= d_min):
         set_all_indices("mid")
         s = score_from_session()
@@ -353,6 +377,7 @@ def fill_random_client(tipo: str, tries: int = 400) -> Tuple[bool, float, str]:
             idx = int(st.session_state[key])
 
             candidates = [i for i in range(len(xs)) if xs[i] < xs[idx]]
+
             if not candidates:
                 continue
 
@@ -394,6 +419,7 @@ def fill_random_client(tipo: str, tries: int = 400) -> Tuple[bool, float, str]:
         if lo <= s <= hi:
             for k, v in state.items():
                 st.session_state[k] = v
+
             return True, s, f"Cliente {tipo} generado correctamente."
 
         dist = abs(s - target_mid)
@@ -406,10 +432,12 @@ def fill_random_client(tipo: str, tries: int = 400) -> Tuple[bool, float, str]:
     if best_state is not None:
         for k, v in best_state.items():
             st.session_state[k] = v
+
         return False, float(best_score), f"No encontré un {tipo} perfecto. Te dejo el más cercano."
 
     set_all_indices("mid")
     s = score_from_session()
+
     return False, s, "Fallback a cliente intermedio."
 
 
@@ -419,6 +447,7 @@ def contributions_from_state(state: Dict[str, int]) -> Tuple[pd.DataFrame, float
 
     for var, w in WEIGHTS.items():
         labels, xs = CONFIG[var]
+
         idx = int(state.get(f"sel_{var}", 0))
         idx = max(0, min(idx, len(xs) - 1))
 
@@ -447,255 +476,14 @@ def make_representative_state(tipo: str) -> Dict[str, int]:
 
 
 # =========================================================
-# VISTA A: SCORING
-# =========================================================
-
-if view == "A. Scoring":
-
-    if not model_loaded:
-        st.info("Sube el JSON del taller en la barra lateral para usar el scoring.")
-
-    else:
-        st.markdown("## Subir archivo para scoring masivo (varias filas)")
-
-        uploaded = st.file_uploader(
-            "Sube CSV o Excel con una fila por cliente (columnas = variables)",
-            type=["csv", "xlsx"]
-        )
-
-        def build_template_xlsx() -> bytes:
-            wb = Workbook()
-            ws = wb.active
-            ws.title = "Plantilla"
-            ws.append(list(WEIGHTS.keys()))
-            ws.append(["(elige una opción exacta o índice 0..k-1)"] + [""] * (len(WEIGHTS) - 1))
-            bio = BytesIO()
-            wb.save(bio)
-            return bio.getvalue()
-
-        st.download_button(
-            "⬇️ Descargar plantilla Excel (vacía)",
-            data=build_template_xlsx(),
-            file_name="plantilla_clientes_scoring.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-
-        if uploaded is not None:
-            try:
-                if uploaded.name.lower().endswith(".csv"):
-                    df_up = pd.read_csv(uploaded)
-                else:
-                    df_up = pd.read_excel(uploaded)
-
-                if df_up.empty:
-                    st.error("El archivo está vacío.")
-                else:
-                    st.success(f"Archivo cargado: {df_up.shape[0]} clientes, {df_up.shape[1]} columnas.")
-
-                    df_res = df_up.copy()
-                    df_res["Score_total_%"] = df_res.apply(score_row, axis=1)
-                    df_res["Tipo"] = df_res["Score_total_%"].apply(classify)
-
-                    dist = (
-                        df_res["Tipo"]
-                        .value_counts(normalize=True)
-                        .reindex(["A", "B", "C", "D", "E"])
-                        .fillna(0) * 100
-                    )
-
-                    cA, cB, cC, cD, cE = st.columns(5)
-                    cA.metric("% Tipo A", f"{dist['A']:.1f}%")
-                    cB.metric("% Tipo B", f"{dist['B']:.1f}%")
-                    cC.metric("% Tipo C", f"{dist['C']:.1f}%")
-                    cD.metric("% Tipo D", f"{dist['D']:.1f}%")
-                    cE.metric("% Tipo E", f"{dist['E']:.1f}%")
-
-                    st.markdown("### Resultados por cliente")
-
-                    id_col = st.selectbox(
-                        "Columna identificadora (opcional, para mostrar primero)",
-                        options=["(ninguna)"] + list(df_up.columns),
-                        index=0
-                    )
-
-                    show_cols = []
-
-                    if id_col != "(ninguna)":
-                        show_cols.append(id_col)
-
-                    show_cols += ["Score_total_%", "Tipo"]
-
-                    sample_vars = [v for v in VAR_LIST if v in df_res.columns][:6]
-                    show_cols += sample_vars
-
-                    st.dataframe(
-                        df_res[show_cols].sort_values("Score_total_%", ascending=False),
-                        use_container_width=True
-                    )
-
-                    csv_bytes = df_res.to_csv(index=False).encode("utf-8")
-
-                    st.download_button(
-                        "⬇️ Descargar resultados (CSV)",
-                        data=csv_bytes,
-                        file_name="resultados_scoring_clientes.csv",
-                        mime="text/csv"
-                    )
-
-                    st.markdown("#### Nota")
-                    st.write(
-                        "Si alguna variable no está en el archivo o no coincide exactamente con una opción/índice, "
-                        "esa variable cuenta como x=0 en ese cliente."
-                    )
-
-            except Exception as e:
-                st.error(f"No he podido leer/procesar el archivo: {e}")
-
-        st.divider()
-
-        st.markdown("## Scoring manual de 1 cliente (inputs)")
-
-        ensure_state()
-        min_s, max_s = min_max_score_possible()
-
-        st.caption(f"Rango teórico con este modelo: mínimo {min_s:.2f}% · máximo {max_s:.2f}%")
-
-        c1, c2, c3, c4, c5 = st.columns(5)
-
-        with c1:
-            if st.button("🎲 Tipo A (muy alto)", key="btnA"):
-                ok, s, msg = fill_random_client("A")
-                (st.success if ok else st.warning)(f"{msg} Score: {s:.2f}%")
-
-        with c2:
-            if st.button("🎲 Tipo B (alto)", key="btnB"):
-                ok, s, msg = fill_random_client("B")
-                (st.success if ok else st.warning)(f"{msg} Score: {s:.2f}%")
-
-        with c3:
-            if st.button("🎲 Tipo C (medio)", key="btnC"):
-                ok, s, msg = fill_random_client("C")
-                (st.success if ok else st.warning)(f"{msg} Score: {s:.2f}%")
-
-        with c4:
-            if st.button("🎲 Tipo D (bajo)", key="btnD"):
-                ok, s, msg = fill_random_client("D")
-                (st.success if ok else st.warning)(f"{msg} Score: {s:.2f}%")
-
-        with c5:
-            if st.button("🎲 Tipo E (muy bajo)", key="btnE"):
-                ok, s, msg = fill_random_client("E")
-                (st.success if ok else st.warning)(f"{msg} Score: {s:.2f}%")
-
-        left, right = st.columns([1.3, 1])
-        rows = []
-        total = 0.0
-
-        with left:
-            for var, weight in WEIGHTS.items():
-                labels, xs = CONFIG[var]
-
-                idx = st.selectbox(
-                    f"{var}  —  Peso {weight}%",
-                    options=list(range(len(labels))),
-                    format_func=lambda i: labels[i],
-                    key=f"sel_{var}",
-                )
-
-                x = float(xs[int(idx)])
-                contrib = weight * x
-                total += contrib
-
-                rows.append({
-                    "Variable": var,
-                    "Selección": labels[int(idx)],
-                    "Peso (%)": weight,
-                    "x (0-1)": round(x, 6),
-                    "Contribución (%)": round(contrib, 4),
-                })
-
-        with right:
-            st.metric("Score total del cliente (%)", f"{total:.2f}")
-            st.metric("Tipo", classify(total))
-            st.caption("Tipo A/B/C/D/E se calcula con los umbrales configurados en la barra lateral.")
-
-        st.dataframe(
-            pd.DataFrame(rows).sort_values("Contribución (%)", ascending=False),
-            use_container_width=True
-        )
-
-        st.markdown("## Fórmula")
-        st.latex(r"Score=\sum_i (Peso_i \cdot x_i)")
-
-
-# =========================================================
-# VISTA B: RESUMEN ESTRATÉGICO
-# =========================================================
-
-elif view == "B. Resumen estratégico":
-
-    if not model_loaded:
-        st.info("Sube el JSON del taller en la barra lateral para ver el resumen estratégico.")
-
-    else:
-        st.markdown("## 👤 Resumen estratégico (buyer persona)")
-
-        min_s, max_s = min_max_score_possible()
-
-        st.info(
-            f"Con el modelo actual, el score teórico va de **{min_s:.2f}%** a **{max_s:.2f}%**. "
-            f"Umbrales: **A ≥ {a_min:.1f}%**, **B ≥ {b_min:.1f}%**, "
-            f"**C ≥ {c_min:.1f}%**, **D ≥ {d_min:.1f}%**, **E < {d_min:.1f}%**."
-        )
-
-        if not (a_min >= b_min >= c_min >= d_min):
-            st.warning("⚠️ Umbrales incoherentes: asegúrate de que **A ≥ B ≥ C ≥ D**.")
-
-        types = ["A", "B", "C", "D", "E"]
-        icons = {
-            "A": "🟢",
-            "B": "🔵",
-            "C": "🟡",
-            "D": "🟠",
-            "E": "🔴",
-        }
-
-        cols = st.columns(5)
-
-        def drivers_md(df: pd.DataFrame, topn: int = 5) -> str:
-            top = df.head(topn)
-            lines = []
-
-            for _, r in top.iterrows():
-                lines.append(
-                    f"- **{r['Variable']}** → *{r['Selección']}* "
-                    f"(**{r['Contribución (%)']:.2f}%**)"
-                )
-
-            return "\n".join(lines)
-
-        for i, t in enumerate(types):
-            state = make_representative_state(t)
-            dfT, scoreT = contributions_from_state(state)
-
-            with cols[i]:
-                st.markdown(f"### {icons[t]} Cliente Tipo {t}")
-                st.metric("Ejemplo generado", f"{scoreT:.2f}%")
-                st.markdown("**Drivers (top 5)**")
-                st.markdown(drivers_md(dfT, topn=5))
-
-        st.divider()
-        st.markdown("### 🧾 Notas")
-        st.write("Los ejemplos se recalculan con tu JSON y los umbrales A/B/C/D/E actuales.")
-
-
-# =========================================================
 # VISTA C: AYUDA
 # =========================================================
 
-elif view == "C. Ayuda":
+if view == "C. Ayuda":
 
     st.markdown("# Ayuda y documentación de la app")
+
+    st.info("Esta pantalla funciona aunque no hayas cargado todavía el JSON del taller.")
 
     st.markdown("""
     ## ¿Para qué sirve esta aplicación?
@@ -817,3 +605,251 @@ elif view == "C. Ayuda":
     6. Subir el archivo de clientes.
     7. Descargar los resultados.
     """)
+
+
+# =========================================================
+# VISTA A: SCORING
+# =========================================================
+
+elif view == "A. Scoring":
+
+    if not model_loaded:
+        st.info("Sube el JSON del taller en la barra lateral para usar el scoring.")
+
+    else:
+        st.markdown("## Subir archivo para scoring masivo")
+
+        uploaded = st.file_uploader(
+            "Sube CSV o Excel con una fila por cliente",
+            type=["csv", "xlsx"]
+        )
+
+        def build_template_xlsx() -> bytes:
+            wb = Workbook()
+            ws = wb.active
+            ws.title = "Plantilla"
+
+            ws.append(list(WEIGHTS.keys()))
+            ws.append(["(elige una opción exacta o índice 0..k-1)"] + [""] * (len(WEIGHTS) - 1))
+
+            bio = BytesIO()
+            wb.save(bio)
+
+            return bio.getvalue()
+
+        st.download_button(
+            "⬇️ Descargar plantilla Excel",
+            data=build_template_xlsx(),
+            file_name="plantilla_clientes_scoring.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+        if uploaded is not None:
+            try:
+                if uploaded.name.lower().endswith(".csv"):
+                    df_up = pd.read_csv(uploaded)
+                else:
+                    df_up = pd.read_excel(uploaded)
+
+                if df_up.empty:
+                    st.error("El archivo está vacío.")
+
+                else:
+                    st.success(f"Archivo cargado: {df_up.shape[0]} clientes, {df_up.shape[1]} columnas.")
+
+                    df_res = df_up.copy()
+                    df_res["Score_total_%"] = df_res.apply(score_row, axis=1)
+                    df_res["Tipo"] = df_res["Score_total_%"].apply(classify)
+
+                    dist = (
+                        df_res["Tipo"]
+                        .value_counts(normalize=True)
+                        .reindex(["A", "B", "C", "D", "E"])
+                        .fillna(0) * 100
+                    )
+
+                    cA, cB, cC, cD, cE = st.columns(5)
+
+                    cA.metric("% Tipo A", f"{dist['A']:.1f}%")
+                    cB.metric("% Tipo B", f"{dist['B']:.1f}%")
+                    cC.metric("% Tipo C", f"{dist['C']:.1f}%")
+                    cD.metric("% Tipo D", f"{dist['D']:.1f}%")
+                    cE.metric("% Tipo E", f"{dist['E']:.1f}%")
+
+                    st.markdown("### Resultados por cliente")
+
+                    id_col = st.selectbox(
+                        "Columna identificadora",
+                        options=["(ninguna)"] + list(df_up.columns),
+                        index=0
+                    )
+
+                    show_cols = []
+
+                    if id_col != "(ninguna)":
+                        show_cols.append(id_col)
+
+                    show_cols += ["Score_total_%", "Tipo"]
+
+                    sample_vars = [v for v in VAR_LIST if v in df_res.columns][:6]
+                    show_cols += sample_vars
+
+                    st.dataframe(
+                        df_res[show_cols].sort_values("Score_total_%", ascending=False),
+                        use_container_width=True
+                    )
+
+                    csv_bytes = df_res.to_csv(index=False).encode("utf-8")
+
+                    st.download_button(
+                        "⬇️ Descargar resultados CSV",
+                        data=csv_bytes,
+                        file_name="resultados_scoring_clientes.csv",
+                        mime="text/csv"
+                    )
+
+                    st.caption(
+                        "Si una variable no está en el archivo o no coincide exactamente con una opción/índice, cuenta como x=0."
+                    )
+
+            except Exception as e:
+                st.error(f"No he podido leer/procesar el archivo: {e}")
+
+        st.divider()
+
+        st.markdown("## Scoring manual de 1 cliente")
+
+        ensure_state()
+
+        min_s, max_s = min_max_score_possible()
+
+        st.caption(f"Rango teórico con este modelo: mínimo {min_s:.2f}% · máximo {max_s:.2f}%")
+
+        c1, c2, c3, c4, c5 = st.columns(5)
+
+        with c1:
+            if st.button("🎲 Tipo A", key="btnA"):
+                ok, s, msg = fill_random_client("A")
+                (st.success if ok else st.warning)(f"{msg} Score: {s:.2f}%")
+
+        with c2:
+            if st.button("🎲 Tipo B", key="btnB"):
+                ok, s, msg = fill_random_client("B")
+                (st.success if ok else st.warning)(f"{msg} Score: {s:.2f}%")
+
+        with c3:
+            if st.button("🎲 Tipo C", key="btnC"):
+                ok, s, msg = fill_random_client("C")
+                (st.success if ok else st.warning)(f"{msg} Score: {s:.2f}%")
+
+        with c4:
+            if st.button("🎲 Tipo D", key="btnD"):
+                ok, s, msg = fill_random_client("D")
+                (st.success if ok else st.warning)(f"{msg} Score: {s:.2f}%")
+
+        with c5:
+            if st.button("🎲 Tipo E", key="btnE"):
+                ok, s, msg = fill_random_client("E")
+                (st.success if ok else st.warning)(f"{msg} Score: {s:.2f}%")
+
+        left, right = st.columns([1.3, 1])
+
+        rows = []
+        total = 0.0
+
+        with left:
+            for var, weight in WEIGHTS.items():
+                labels, xs = CONFIG[var]
+
+                idx = st.selectbox(
+                    f"{var} — Peso {weight}%",
+                    options=list(range(len(labels))),
+                    format_func=lambda i: labels[i],
+                    key=f"sel_{var}",
+                )
+
+                x = float(xs[int(idx)])
+                contrib = weight * x
+                total += contrib
+
+                rows.append({
+                    "Variable": var,
+                    "Selección": labels[int(idx)],
+                    "Peso (%)": weight,
+                    "x (0-1)": round(x, 6),
+                    "Contribución (%)": round(contrib, 4),
+                })
+
+        with right:
+            st.metric("Score total del cliente (%)", f"{total:.2f}")
+            st.metric("Tipo", classify(total))
+
+        st.dataframe(
+            pd.DataFrame(rows).sort_values("Contribución (%)", ascending=False),
+            use_container_width=True
+        )
+
+        st.markdown("## Fórmula")
+        st.latex(r"Score=\sum_i (Peso_i \cdot x_i)")
+
+
+# =========================================================
+# VISTA B: RESUMEN ESTRATÉGICO
+# =========================================================
+
+elif view == "B. Resumen estratégico":
+
+    if not model_loaded:
+        st.info("Sube el JSON del taller en la barra lateral para ver el resumen estratégico.")
+
+    else:
+        st.markdown("## 👤 Resumen estratégico")
+
+        min_s, max_s = min_max_score_possible()
+
+        st.info(
+            f"Con el modelo actual, el score teórico va de **{min_s:.2f}%** a **{max_s:.2f}%**. "
+            f"Umbrales: **A ≥ {a_min:.1f}%**, **B ≥ {b_min:.1f}%**, "
+            f"**C ≥ {c_min:.1f}%**, **D ≥ {d_min:.1f}%**, **E < {d_min:.1f}%**."
+        )
+
+        if not (a_min >= b_min >= c_min >= d_min):
+            st.warning("⚠️ Umbrales incoherentes: asegúrate de que A ≥ B ≥ C ≥ D.")
+
+        types = ["A", "B", "C", "D", "E"]
+
+        icons = {
+            "A": "🟢",
+            "B": "🔵",
+            "C": "🟡",
+            "D": "🟠",
+            "E": "🔴",
+        }
+
+        cols = st.columns(5)
+
+        def drivers_md(df: pd.DataFrame, topn: int = 5) -> str:
+            top = df.head(topn)
+            lines = []
+
+            for _, r in top.iterrows():
+                lines.append(
+                    f"- **{r['Variable']}** → *{r['Selección']}* "
+                    f"(**{r['Contribución (%)']:.2f}%**)"
+                )
+
+            return "\n".join(lines)
+
+        for i, t in enumerate(types):
+            state = make_representative_state(t)
+            dfT, scoreT = contributions_from_state(state)
+
+            with cols[i]:
+                st.markdown(f"### {icons[t]} Cliente Tipo {t}")
+                st.metric("Ejemplo generado", f"{scoreT:.2f}%")
+                st.markdown("**Drivers principales**")
+                st.markdown(drivers_md(dfT, topn=5))
+
+        st.divider()
+        st.markdown("### 🧾 Notas")
+        st.write("Los ejemplos se recalculan con tu JSON y los umbrales actuales.")
