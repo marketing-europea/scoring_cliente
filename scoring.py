@@ -129,7 +129,6 @@ def build_model_from_taller_json(
 # 2) APP
 # =========================================================
 
-st.set_page_config(page_title="Calculadora Scoring Cliente", layout="wide")
 st.title("Calculadora de Scoring de Cliente (con modelo del taller)")
 st.caption("Carga el JSON exportado del taller. Score = Σ(Peso% · x). Modo 1 cliente o archivo masivo.")
 
@@ -449,6 +448,10 @@ def make_representative_state(tipo: str) -> Dict[str, int]:
 # =========================================================
 if view == "A. Scoring":
 
+    if not model_loaded:
+        st.info("Sube el JSON del taller en la barra lateral para usar el scoring.")
+        st.stop()
+
     st.markdown("## Subir archivo para scoring masivo (varias filas)")
     uploaded = st.file_uploader(
         "Sube CSV o Excel con una fila por cliente (columnas = variables)",
@@ -614,10 +617,16 @@ if view == "A. Scoring":
     st.markdown("## Fórmula")
     st.latex(r"Score=\sum_i (Peso_i \cdot x_i)")
 
+
 # =========================================================
 # VISTA B: RESUMEN ESTRATÉGICO
 # =========================================================
-else:
+elif view == "B. Resumen estratégico":
+
+    if not model_loaded:
+        st.info("Sube el JSON del taller en la barra lateral para ver el resumen estratégico.")
+        st.stop()
+
     st.markdown("## 👤 Resumen estratégico (buyer persona)")
 
     min_s, max_s = min_max_score_possible()
@@ -627,7 +636,7 @@ else:
     )
 
     if not (a_min >= b_min >= c_min >= d_min):
-        st.warning("⚠️ Umbrales incoherentes: asegúrate de que **A ≥ B ≥ C ≥ D** (E queda por debajo de D).")
+        st.warning("⚠️ Umbrales incoherentes: asegúrate de que **A ≥ B ≥ C ≥ D**.")
 
     types = ["A", "B", "C", "D", "E"]
     icons = {"A": "🟢", "B": "🔵", "C": "🟡", "D": "🟠", "E": "🔴"}
@@ -647,7 +656,6 @@ else:
         with cols[i]:
             st.markdown(f"### {icons[t]} Cliente Tipo {t}")
             st.metric("Ejemplo generado", f"{scoreT:.2f}%")
-
             st.markdown("**Drivers (top 5)**")
             st.markdown(drivers_md(dfT, topn=5))
 
@@ -655,11 +663,12 @@ else:
     st.markdown("### 🧾 Notas")
     st.write("Los ejemplos se recalculan con tu JSON y los umbrales A/B/C/D/E actuales.")
 
+
 # =========================================================
 # VISTA C: AYUDA
 # =========================================================
+elif view == "C. Ayuda":
 
-if view == "C. Ayuda":
     st.markdown("# Ayuda y documentación de la app")
 
     st.markdown("""
@@ -670,7 +679,6 @@ if view == "C. Ayuda":
     El objetivo es clasificar clientes en tipos **A, B, C, D o E** según su puntuación total.
 
     La fórmula utilizada es:
-
     """)
 
     st.latex(r"Score=\sum_i (Peso_i \cdot x_i)")
@@ -688,9 +696,9 @@ if view == "C. Ayuda":
 
     ### 1. JSON del modelo del taller
 
-    Es obligatorio cargar un archivo **JSON** en la barra lateral.
+    Es obligatorio para calcular scores, pero **no es necesario para consultar esta ayuda**.
 
-    Este archivo debe contener:
+    Debe contener:
 
     - Variables del modelo.
     - Peso de cada variable.
@@ -698,67 +706,37 @@ if view == "C. Ayuda":
     - Etiquetas de cada categoría.
     - Gaps o penalizaciones entre categorías.
 
-    Sin este archivo, la aplicación no puede calcular scores.
+    ### 2. CSV o Excel para scoring masivo
 
-    ---
+    Es opcional. Debe tener una fila por cliente y columnas con los mismos nombres que las variables del JSON.
 
-    ### 2. Archivo CSV o Excel para scoring masivo
+    Los valores pueden ser:
 
-    Opcionalmente, se puede subir un archivo **CSV** o **Excel (.xlsx)** con una fila por cliente.
+    - La etiqueta exacta de la categoría.
+    - El índice numérico de la categoría, empezando en 0.
 
-    Cada columna debe corresponderse con una variable del modelo.
-
-    Los valores pueden introducirse de dos formas:
-
-    - Usando la **etiqueta exacta** de la categoría.
-    - Usando el **índice numérico** de la categoría, empezando en 0.
-
-    Si una variable no existe en el archivo, está vacía o no coincide con ninguna opción válida, contará como **x = 0**.
+    Si una variable no existe, está vacía o no coincide, contará como **x = 0**.
 
     ---
 
     ## Pantalla A: Scoring
 
-    En esta pantalla se puede trabajar de dos formas:
+    Permite hacer scoring masivo y scoring manual.
 
-    ### Scoring masivo
-
-    Permite subir un CSV o Excel con varios clientes.
-
-    La app devuelve:
-
-    - Score total de cada cliente.
-    - Tipo A/B/C/D/E.
-    - Distribución porcentual por tipo.
-    - Archivo CSV descargable con los resultados.
-
-    También se puede descargar una **plantilla Excel vacía** con las columnas necesarias.
-
-    ### Scoring manual de un cliente
-
-    Permite seleccionar manualmente una categoría para cada variable.
-
-    La app calcula en tiempo real:
+    En scoring masivo, la app devuelve:
 
     - Score total.
-    - Tipo asignado.
-    - Contribución de cada variable al score.
+    - Tipo A/B/C/D/E.
+    - Distribución porcentual por tipo.
+    - CSV descargable con resultados.
 
-    Además, incluye botones para generar ejemplos aleatorios de clientes tipo A, B, C, D o E.
+    En scoring manual, permite seleccionar categoría por variable y ver la contribución de cada una.
 
     ---
 
     ## Pantalla B: Resumen estratégico
 
-    Esta pantalla genera una visión resumida de los perfiles tipo.
-
-    Para cada cliente A, B, C, D y E muestra:
-
-    - Un ejemplo de score.
-    - Las principales variables que más contribuyen.
-    - Los drivers más relevantes del perfil.
-
-    Sirve para entender qué características definen a cada tipo de cliente.
+    Genera ejemplos de clientes tipo A, B, C, D y E, mostrando los principales drivers de cada perfil.
 
     ---
 
@@ -768,47 +746,25 @@ if view == "C. Ayuda":
 
     Por defecto:
 
-    - Tipo A: score igual o superior a 80.
-    - Tipo B: score igual o superior a 65.
-    - Tipo C: score igual o superior a 50.
-    - Tipo D: score igual o superior a 30.
-    - Tipo E: score inferior al umbral de D.
+    - Tipo A: score ≥ 80.
+    - Tipo B: score ≥ 65.
+    - Tipo C: score ≥ 50.
+    - Tipo D: score ≥ 30.
+    - Tipo E: score < 30.
 
-    Es importante mantener los umbrales en orden:
+    Es importante mantener:
 
     **A ≥ B ≥ C ≥ D**
 
     ---
 
-    ## Reglas importantes
-
-    - El JSON del taller es obligatorio.
-    - Los pesos y valores normalizados se leen del JSON.
-    - El scoring masivo solo funciona correctamente si las columnas coinciden con las variables del modelo.
-    - Las etiquetas deben coincidir exactamente con las opciones del JSON.
-    - Los índices numéricos empiezan en 0.
-    - Los valores no reconocidos puntúan como 0.
-
-    ---
-
-    ## Salidas de la aplicación
-
-    La app permite obtener:
-
-    - Score individual.
-    - Clasificación A/B/C/D/E.
-    - Ranking de contribución por variable.
-    - Resultados masivos descargables en CSV.
-    - Resumen estratégico de perfiles tipo.
-
-    ---
-
     ## Uso recomendado
 
-    1. Cargar el JSON exportado del taller.
-    2. Revisar o ajustar los umbrales A/B/C/D/E.
-    3. Usar el scoring manual para validar casos individuales.
-    4. Descargar la plantilla Excel si se va a hacer scoring masivo.
-    5. Subir el archivo de clientes.
-    6. Descargar los resultados finales.
+    1. Abrir la ayuda si se necesita entender la app.
+    2. Cargar el JSON del taller.
+    3. Revisar los umbrales A/B/C/D/E.
+    4. Probar un cliente manual.
+    5. Descargar la plantilla Excel.
+    6. Subir el archivo de clientes.
+    7. Descargar los resultados.
     """)
